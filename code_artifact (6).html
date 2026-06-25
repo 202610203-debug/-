@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-Basketball Championship</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #0f172a;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .font-title {
+            font-family: 'Black Han Sans', sans-serif;
+        }
+        /* 애니메이션 효과 */
+        @keyframes pulse-fast {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+        .pulse-btn {
+            animation: pulse-fast 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4 text-white overflow-hidden">
+
+    <!-- 메인 컨테이너 -->
+    <div class="w-full max-w-4xl bg-slate-900 rounded-3xl border-4 border-orange-500 shadow-2xl shadow-orange-500/20 overflow-hidden relative">
+        
+        <!-- 상단 경기 스코어보드 (게임 진행 중에만 활성화) -->
+        <div id="scoreboard" class="hidden bg-slate-950 p-4 border-b-2 border-slate-800 flex justify-between items-center px-6 md:px-12">
+            <!-- 홈 팀 (플레이어) -->
+            <div class="flex items-center space-x-3">
+                <span class="text-xs bg-blue-600 text-white px-2 py-0.5 rounded font-bold uppercase">HOME</span>
+                <span class="font-title text-xl md:text-2xl text-blue-400">코리아 히어로즈</span>
+                <span id="player-score" class="font-title text-3xl md:text-4xl text-white bg-slate-900 px-3 py-1 rounded border border-slate-700">0</span>
+            </div>
+            
+            <!-- 경기 시간 및 쿼터 -->
+            <div class="text-center">
+                <div id="game-quarter" class="text-orange-500 font-bold text-xs md:text-sm tracking-widest">1ST QUARTER</div>
+                <div id="game-timer" class="font-title text-2xl md:text-3xl text-red-500 font-mono tracking-wider">02:00</div>
+            </div>
+            
+            <!-- 원정 팀 (AI) -->
+            <div class="flex items-center space-x-3">
+                <span id="enemy-score" class="font-title text-3xl md:text-4xl text-white bg-slate-900 px-3 py-1 rounded border border-slate-700">0</span>
+                <span class="font-title text-xl md:text-2xl text-red-400">글로벌 자이언츠</span>
+                <span class="text-xs bg-red-600 text-white px-2 py-0.5 rounded font-bold uppercase">AWAY</span>
+            </div>
+        </div>
+
+        <!-- 게임 화면 영역 -->
+        <div class="relative w-full aspect-[16/9] bg-slate-950 flex items-center justify-center">
+            
+            <!-- Canvas: 실제 경기 장면 렌더링 -->
+            <canvas id="gameCanvas" class="w-full h-full block bg-slate-950"></canvas>
+
+            <!-- 1. 메인 대기 화면 (시작 화면) -->
+            <div id="screen-start" class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center z-10">
+                <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#f97316_1px,transparent_1px)] [background-size:16px_16px]"></div>
+                
+                <h1 class="font-title text-5xl md:text-7xl text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-400 to-red-500 drop-shadow-lg mb-2">
+                    슈퍼 타이밍 바스켓볼
+                </h1>
+                <p class="text-slate-400 text-sm md:text-base max-w-md mb-8">
+                    정교한 타이밍 슛으로 적의 수비를 뚫고 승리하세요!<br>
+                    총 4쿼터 동안 최고의 득점력을 증명해 보십시오.
+                </p>
+
+                <!-- 게임 조작 안내 -->
+                <div class="bg-slate-900/90 border border-slate-700 rounded-2xl p-4 max-w-md w-full mb-8 text-left text-xs md:text-sm space-y-2">
+                    <div class="font-bold text-orange-400 border-b border-slate-800 pb-1.5 mb-2 flex items-center justify-between">
+                        <span>🎮 조작 방법</span>
+                        <span class="text-slate-500 font-normal">PC & 모바일 지원</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>슛 시도 (공 잡은 상태)</span>
+                        <span class="bg-slate-800 px-2 py-0.5 rounded font-bold text-amber-300">Space 키 누른 상태로 유지</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>슛 게이지 멈추기 (초록색 타겟)</span>
+                        <span class="bg-slate-800 px-2 py-0.5 rounded font-bold text-amber-300">Space 키 떼기 (또는 버튼 떼기)</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span>수비 블록 시도 (수비 시)</span>
+                        <span class="bg-slate-800 px-2 py-0.5 rounded font-bold text-amber-300">Space 연타 또는 화면 탭</span>
+                    </div>
+                </div>
+
+                <button id="btn-start" class="pulse-btn font-title text-xl md:text-2xl bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white px-8 py-4 rounded-full shadow-lg shadow-orange-500/30 transition-all transform hover:scale-105">
+                    경기 시작하기 🏀
+                </button>
+            </div>
+
+            <!-- 2. 경기 쿼터 안내 및 휴식 화면 -->
+            <div id="screen-quarter" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center z-10">
+                <div class="text-orange-500 font-bold tracking-widest text-lg mb-2" id="quarter-transition-title">QUARTER COMPLETED</div>
+                <h2 class="font-title text-4xl md:text-5xl text-white mb-6" id="quarter-transition-subtitle">제 1쿼터 종료</h2>
+                
+                <div class="flex items-center justify-center space-x-8 bg-slate-900 p-6 rounded-2xl border border-slate-800 mb-8 w-full max-w-sm">
+                    <div class="text-center">
+                        <div class="text-xs text-slate-400 mb-1">코리아 (홈)</div>
+                        <div class="font-title text-4xl text-blue-400" id="quarter-score-player">0</div>
+                    </div>
+                    <div class="font-title text-2xl text-slate-600">VS</div>
+                    <div class="text-center">
+                        <div class="text-xs text-slate-400 mb-1">글로벌 (원정)</div>
+                        <div class="font-title text-4xl text-red-400" id="quarter-score-enemy">0</div>
+                    </div>
+                </div>
+
+                <button id="btn-next-quarter" class="font-title text-lg bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-xl transition-all">
+                    다음 쿼터 시작 ⏩
+                </button>
+            </div>
+
+            <!-- 3. 경기 결과 및 시상대 화면 -->
+            <div id="screen-result" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center z-10">
+                <span class="text-4xl mb-2" id="result-emoji">🏆</span>
+                <h2 class="font-title text-4xl md:text-6xl text-amber-400 mb-1" id="result-title">우승을 차지했습니다!</h2>
+                <p class="text-slate-400 text-sm md:text-base max-w-md mb-6" id="result-desc">끝까지 집중력을 잃지 않고 멋진 역전 드라마를 썼습니다.</p>
+
+                <!-- 최종 스코어 보드 -->
+                <div class="bg-slate-900 border-2 border-slate-800 rounded-3xl p-6 max-w-md w-full mb-8">
+                    <div class="grid grid-cols-3 gap-4 items-center">
+                        <div class="text-center">
+                            <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-xl mx-auto mb-2 font-bold">KR</div>
+                            <div class="font-bold text-sm">코리아 히어로즈</div>
+                            <div class="font-title text-3xl text-blue-400 mt-1" id="final-score-player">102</div>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-xs bg-slate-800 px-2 py-1 rounded text-slate-400 font-bold">최종 점수</span>
+                            <div class="font-title text-2xl text-slate-500 my-2">VS</div>
+                            <span class="text-xs text-emerald-400 block" id="match-mvp">MVP: 플레이어</span>
+                        </div>
+                        <div class="text-center">
+                            <div class="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-xl mx-auto mb-2 font-bold">GB</div>
+                            <div class="font-bold text-sm">글로벌 자이언츠</div>
+                            <div class="font-title text-3xl text-red-400 mt-1" id="final-score-enemy">98</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex space-x-4">
+                    <button id="btn-replay" class="font-title text-lg bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-xl transition-all">
+                        처음부터 다시하기 🔄
+                    </button>
+                </div>
+            </div>
+
+            <!-- 인게임 슛 타이밍 UI 오버레이 -->
+            <div id="timing-ui" class="hidden absolute bottom-6 left-1/2 transform -translate-x-1/2 w-11/12 max-w-md bg-slate-900/90 border border-slate-700 p-4 rounded-2xl shadow-2xl flex flex-col items-center">
+                <div class="flex justify-between w-full text-xs text-slate-400 font-bold mb-1.5">
+                    <span id="shot-type-label">3점슛 시도 중!</span>
+                    <span id="timing-closeness" class="text-orange-400">타이밍에 맞춰 떼세요!</span>
+                </div>
+                
+                <!-- 게이지 바 시스템 -->
+                <div class="relative w-full h-8 bg-slate-950 rounded-full border border-slate-800 overflow-hidden">
+                    <!-- 타겟존 (녹색 영역) -->
+                    <div id="target-zone" class="absolute h-full bg-emerald-500/50 border-x-2 border-emerald-400" style="left: 65%; width: 15%;"></div>
+                    <!-- 퍼펙트 라인 -->
+                    <div id="perfect-line" class="absolute h-full w-1 bg-yellow-400 shadow-[0_0_8px_#fbbf24]" style="left: 72.5%;"></div>
+                    <!-- 현재 게이지 바 -->
+                    <div id="gauge-bar" class="absolute h-full bg-gradient-to-r from-orange-500 to-amber-400 w-0 transition-all duration-75"></div>
+                    <!-- 게이지 포인터 헤드 (빛나는 라인) -->
+                    <div id="gauge-pointer" class="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_10px_#fff] hidden"></div>
+                </div>
+
+                <!-- 모바일용 터치&클릭 슛 버튼 -->
+                <button id="btn-shoot-action" class="mt-3 w-full bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-title py-3 px-6 rounded-xl shadow-lg transition-all text-center touch-none">
+                    슛 버튼 (눌렀다 떼기) 🏀
+                </button>
+            </div>
+
+            <!-- 인게임 수비 저지 UI 오버레이 (탭 연타) -->
+            <div id="defense-ui" class="hidden absolute bottom-6 left-1/2 transform -translate-x-1/2 w-11/12 max-w-md bg-slate-900/90 border border-slate-700 p-4 rounded-2xl shadow-2xl flex flex-col items-center">
+                <div class="text-center mb-1">
+                    <span class="text-xs bg-red-600 text-white px-2 py-0.5 rounded font-bold animate-pulse">DEFENSE</span>
+                    <h4 class="font-title text-base mt-1">상대방의 공격! 슛을 방해하세요!</h4>
+                    <p class="text-[10px] text-slate-400">버튼을 빠르게 연타하여 수비 게이지를 높이세요!</p>
+                </div>
+
+                <!-- 수비 바 -->
+                <div class="relative w-full h-6 bg-slate-950 rounded-full border border-slate-800 overflow-hidden my-2">
+                    <div id="defense-bar" class="absolute h-full bg-red-600 w-0 transition-all duration-100"></div>
+                    <div class="absolute inset-0 flex items-center justify-center text-xs font-bold text-white shadow-sm" id="defense-percent-text">
+                        방어율: 0%
+                    </div>
+                </div>
+
+                <!-- 모바일용 연타 버튼 -->
+                <button id="btn-block-action" class="w-full bg-red-600 hover:bg-red-700 active:scale-95 text-white font-title py-3 px-6 rounded-xl shadow-lg transition-all text-center touch-none">
+                    블로킹!! (마구 연타하세요) 🛡️
+                </button>
+            </div>
+
+            <!-- 실시간 게임 해설 아나운서 피드 -->
+            <div id="announcer-box" class="absolute top-16 left-4 right-4 bg-slate-900/80 backdrop-blur-sm border border-slate-800 p-2 rounded-xl flex items-center space-x-3 transition-all transform duration-300 opacity-0 pointer-events-none">
+                <span class="text-xl">🎙️</span>
+                <p id="announcer-text" class="text-xs md:text-sm text-slate-200 font-bold font-mono">코리아 히어로즈의 기습 공격!</p>
+            </div>
+
+            <!-- 간이 팝업 메시지 (Perfect!, Good!, Miss!) -->
+            <div id="pop-message" class="absolute pointer-events-none text-center font-title text-4xl md:text-6xl text-yellow-400 drop-shadow-[0_4px_12px_rgba(0,0,0,1)] scale-0 transition-all duration-300 z-20">
+                PERFECT!
+            </div>
+        </div>
+
+        <!-- 하단 컨트롤 패널 (게임 도움말 등) -->
+        <div class="bg-slate-950 p-4 border-t-2 border-slate-800 flex justify-between items-center text-xs text-slate-500">
+            <span>© 2026 SUPER TIMING BASKETBALL</span>
+            <div class="flex space-x-4">
+                <span>Sound : FX Web Audio</span>
+                <span>v1.0.0</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 오디오 생성을 위한 Web Audio API 래퍼 -->
+    <script>
+        class SoundController {
+            constructor() {
+                this.ctx = null;
+            }
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+            playTone(freq, type, duration, vol) {
+                this.init();
+                if (!this.ctx) return;
+                try {
+                    let osc = this.ctx.createOscillator();
+                    let gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) { console.log(e); }
+            }
+            playShoot() {
+                this.playTone(400, 'sine', 0.15, 0.2);
+                setTimeout(() => this.playTone(600, 'sine', 0.15, 0.15), 50);
+            }
+            playPerfect() {
+                this.playTone(523.25, 'triangle', 0.1, 0.3); // C5
+                setTimeout(() => this.playTone(659.25, 'triangle', 0.1, 0.3), 100); // E5
+                setTimeout(() => this.playTone(783.99, 'triangle', 0.15, 0.3), 200); // G5
+                setTimeout(() => this.playTone(1046.50, 'sine', 0.3, 0.4), 300); // C6
+            }
+            playGoal() {
+                this.playTone(440, 'triangle', 0.1, 0.2);
+                setTimeout(() => this.playTone(554, 'triangle', 0.1, 0.2), 80);
+                setTimeout(() => this.playTone(659, 'triangle', 0.2, 0.3), 160);
+            }
+            playFail() {
+                this.playTone(220, 'sawtooth', 0.3, 0.25);
+                setTimeout(() => this.playTone(180, 'sawtooth', 0.4, 0.2), 150);
+            }
+            playCrowdCheer() {
+                // 노이즈 시뮬레이션으로 환호성 소리
+                this.init();
+                if (!this.ctx) return;
+                try {
+                    const bufferSize = this.ctx.sampleRate * 1.5;
+                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                    const data = buffer.getChannelData(0);
+                    for (let i = 0; i < bufferSize; i++) {
+                        data[i] = Math.random() * 2 - 1;
+                    }
+                    const noise = this.ctx.createBufferSource();
+                    noise.buffer = buffer;
+                    const filter = this.ctx.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.frequency.value = 600;
+                    filter.Q.value = 1.0;
+
+                    const gain = this.ctx.createGain();
+                    gain.gain.setValueAtTime(0, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.15, this.ctx.currentTime + 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 1.4);
+
+                    noise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    noise.start();
+                } catch (e) { console.log(e); }
+            }
+            playDefenseBeep() {
+                this.playTone(880, 'sine', 0.05, 0.15);
+            }
+            playWhistle() {
+                this.playTone(1200, 'sine', 0.15, 0.3);
+                setTimeout(() => this.playTone(1200, 'sine', 0.3, 0.3), 180);
+            }
+        }
+        const sound = new SoundController();
+    </script>
+
+    <!-- 게임 구동 핵심 스크립트 -->
+    <script>
+        // DOM 엘리먼트 획득
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreboard = document.getElementById('scoreboard');
+        const playerScoreEl = document.getElementById('player-score');
+        const enemyScoreEl = document.getElementById('enemy-score');
+        const gameQuarterEl = document.getElementById('game-quarter');
+        const gameTimerEl = document.getElementById('game-timer');
+
+        // 스크린
+        const screenStart = document.getElementById('screen-start');
+        const screenQuarter = document.getElementById('screen-quarter');
+        const screenResult = document.getElementById('screen-result');
+
+        // 버튼
+        const btnStart = document.getElementById('btn-start');
+        const btnNextQuarter = document.getElementById('btn-next-quarter');
+        const btnReplay = document.getElementById('btn-replay');
+
+        // 오버레이 및 게임 UI
+        const timingUi = document.getElementById('timing-ui');
+        const shotTypeLabel = document.getElementById('shot-type-label');
+        const timingCloseness = document.getElementById('timing-closeness');
+        const targetZone = document.getElementById('target-zone');
+        const perfectLine = document.getElementById('perfect-line');
+        const gaugeBar = document.getElementById('gauge-bar');
+        const gaugePointer = document.getElementById('gauge-pointer');
+        const btnShootAction = document.getElementById('btn-shoot-action');
+
+        const defenseUi = document.getElementById('defense-ui');
+        const defenseBar = document.getElementById('defense-bar');
+        const defensePercentText = document.getElementById('defense-percent-text');
+        const btnBlockAction = document.getElementById('btn-block-action');
+
+        const announcerBox = document.getElementById('announcer-box');
+        const announcerText = document.getElementById('announcer-text');
+        const popMessage = document.getElementById('pop-message');
+
+        // ==========================================
+        //  게임 시스템 상태 관리 변수들
+        // ==========================================
+        let gameActive = false;
+        let currentQuarter = 1; 
+        const maxQuarters = 4;
+        let quarterTimeRemaining = 60; // 쿼터당 60초 (가속)
+        let timerInterval = null;
+
+        let score = { player: 0, enemy: 0 };
+        let activePossession = 'player'; // 'player' or 'enemy'
+        let playState = 'idle'; // 'idle', 'player-aiming', 'player-shooting', 'enemy-defending', 'cutscene'
+
+        // 타이밍 슛 시스템 수치들
+        let timingTargetMin = 60; // 타겟 최소 지점 (0~100)
+        let timingTargetMax = 80; // 타겟 최대 지점
+        let perfectSpot = 70;      // 100% 퍼펙트 정확도 지점
+        let gaugeValue = 0;
+        let gaugeDirection = 1;
+        let gaugeSpeed = 2.5;     // 게이지가 차오르는 속도
+        let isSpacePressed = false;
+
+        // 적 타이밍 난이도 조절용
+        let currentShotType = 2;  // 2점슛 or 3점슛
+
+        // 수비 난이도 조절용
+        let defensePressCount = 0;
+        const targetDefensePress = 12; // 3초 이내에 연타해야 하는 횟수
+
+        // ==========================================
+        //  경기 장면 그래픽 시스템 (2.5D 및 애니메이션)
+        // ==========================================
+        
+        // 카메라, 백보드, 농구대 링, 선수 좌표 정의
+        let viewWidth = 800;
+        let viewHeight = 450;
+        
+        // 경기장 환경 요소들
+        let courtColor = '#c2410c'; // 오렌지/나무 계열 브라운 코트
+        let keyColor = '#1e3a8a';   // 파란 페인트존
+
+        // 농구대 정보 (오른쪽 구석 배치)
+        const hoop = {
+            x: 650,
+            y: 120,
+            backboardWidth: 15,
+            backboardHeight: 80,
+            ringRadius: 18,
+            netHeight: 30,
+            netYOffset: 0, // 골이 들어갈 때 출렁거림 연출용
+            shakeTime: 0
+        };
+
+        // 선수 정보
+        const playerObj = {
+            x: 200,
+            y: 330,
+            baseX: 200,
+            baseY: 330,
+            width: 40,
+            height: 80,
+            jumpY: 0,
+            frame: 0,
+            ballInHand: true,
+            pose: 'dribble', // 'dribble', 'gather', 'jump', 'release', 'defend'
+            stateTimer: 0
+        };
+
+        const defenderObj = {
+            x: 480,
+            y: 330,
+            baseX: 480,
+            baseY: 330,
+            width: 40,
+            height: 80,
+            jumpY: 0,
+            pose: 'idle', // 'idle', 'block', 'sad', 'happy'
+            stateTimer: 0
+        };
+
+        // 날아가는 농구공 정보
+        const ballObj = {
+            x: 0,
+            y: 0,
+            startX: 0,
+            startY: 0,
+            targetX: 0,
+            targetY: 0,
+            active: false,
+            progress: 0, // 0 to 1
+            maxHeight: 180,
+            rotation: 0,
+            swishPlayed: false
+        };
+
+        // 파티클 시스템 (슛 성공시 꽃가루 폭죽, 충돌)
+        let particles = [];
+
+        // 관중 캐릭터 단순 그리기 정보 (관중석 채우기)
+        let crowdRows = [];
+        function initCrowd() {
+            crowdRows = [];
+            // 3단 관중석 생성
+            for (let r = 0; r < 3; r++) {
+                let row = [];
+                let count = 45;
+                let y = 50 + r * 15;
+                for (let i = 0; i < count; i++) {
+                    row.push({
+                        x: 10 + i * 18 + (r % 2) * 5,
+                        y: y,
+                        color: `hsl(${10 + Math.random() * 40}, ${50 + Math.random() * 40}%, ${40 + Math.random() * 30}%)`,
+                        bounceOffset: Math.random() * Math.PI * 2,
+                        bounceSpeed: 0.05 + Math.random() * 0.05,
+                        cheering: false
+                    });
+                }
+                crowdRows.push(row);
+            }
+        }
+
+        // 캔버스 반응형 리사이징 처리
+        function resizeCanvas() {
+            const rect = canvas.parentNode.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            // 800x450 비율 유지를 위해 스케일 팩터 연산
+            viewWidth = rect.width;
+            viewHeight = rect.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // ==========================================
+        //  경기 화면 드로잉 (Canvas Render Engine)
+        // ==========================================
+        function drawCourt() {
+            // 1. 경기장 관중석 배경 및 벽면
+            ctx.fillStyle = '#0b1329';
+            ctx.fillRect(0, 0, viewWidth, viewHeight);
+
+            // 관중석 스탠드 계단식 묘사
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 40, viewWidth, 50);
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 90, viewWidth, 10);
+
+            // 2. 관중 그리기
+            let jumpHeightMax = playState === 'cutscene' && ballObj.progress > 0.9 ? 12 : 3;
+            crowdRows.forEach((row, rIdx) => {
+                row.forEach(c => {
+                    let bounce = Math.sin((Date.now() * c.bounceSpeed) + c.bounceOffset) * jumpHeightMax;
+                    if (playState === 'cutscene' && ballObj.progress > 0.8) {
+                        bounce = -Math.abs(bounce) * 2; // 골 근처에서 강한 흥분 연출
+                    }
+                    // 머리
+                    ctx.fillStyle = c.color;
+                    ctx.beginPath();
+                    ctx.arc(c.x, c.y + bounce, 6, 0, Math.PI * 2);
+                    ctx.fill();
+                    // 몸통
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(c.x - 5, c.y + 4 + bounce, 10, 10);
+                });
+            });
+
+            // 3. 코트 바닥 그리기 (원근감을 살린 3D 테두리선 효과)
+            // 지평선 레벨: 160px
+            ctx.fillStyle = '#7c2d12'; // 베이스 우드 딥브라운
+            ctx.beginPath();
+            ctx.moveTo(0, 150);
+            ctx.lineTo(viewWidth, 150);
+            ctx.lineTo(viewWidth, viewHeight);
+            ctx.lineTo(0, viewHeight);
+            ctx.closePath();
+            ctx.fill();
+
+            // 파란색 페인트존 (키 구역)
+            ctx.fillStyle = '#1e3a8a';
+            ctx.beginPath();
+            ctx.moveTo(viewWidth * 0.6, 150);
+            ctx.lineTo(viewWidth, 150);
+            ctx.lineTo(viewWidth, viewHeight);
+            ctx.lineTo(viewWidth * 0.45, viewHeight);
+            ctx.closePath();
+            ctx.fill();
+
+            // 코트 라인 그리기 (흰색 라인들)
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.lineWidth = 3;
+
+            // 3점선 타원 묘사 (베지어 곡선으로 원근감 적용)
+            ctx.beginPath();
+            ctx.moveTo(0, 240);
+            ctx.quadraticCurveTo(viewWidth * 0.4, 250, viewWidth * 0.4, viewHeight);
+            ctx.stroke();
+
+            // 페인트존 라인
+            ctx.beginPath();
+            ctx.moveTo(viewWidth * 0.6, 150);
+            ctx.lineTo(viewWidth * 0.45, viewHeight);
+            ctx.stroke();
+
+            // 자유투 라인 원형 (반원)
+            ctx.beginPath();
+            ctx.arc(viewWidth * 0.52, 260, 45, Math.PI * 0.5, Math.PI * 1.5, true);
+            ctx.stroke();
+
+            // 4. 농구대 지지대 및 보드 그리기
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = '#475569'; // 지지대 메탈 그레이
+            ctx.beginPath();
+            ctx.moveTo(hoop.x + 20, 150);
+            ctx.lineTo(hoop.x + 20, hoop.y - 10);
+            ctx.lineTo(hoop.x + 10, hoop.y - 10);
+            ctx.stroke();
+
+            // 백보드 그리기
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#ffffff';
+            ctx.fillStyle = 'rgba(255,255,255,0.15)'; // 유리 느낌 투명 백보드
+            ctx.fillRect(hoop.x + 5, hoop.y - hoop.backboardHeight / 2, hoop.backboardWidth, hoop.backboardHeight);
+            ctx.strokeRect(hoop.x + 5, hoop.y - hoop.backboardHeight / 2, hoop.backboardWidth, hoop.backboardHeight);
+
+            // 백보드 중앙 붉은 네모박스
+            ctx.strokeStyle = '#ef4444';
+            ctx.strokeRect(hoop.x + 5, hoop.y - 15, 8, 30);
+
+            // 5. 그물(Net) 출렁거림 물리 효과 처리
+            if (hoop.shakeTime > 0) {
+                hoop.netYOffset = Math.sin(Date.now() * 0.05) * 6 * (hoop.shakeTime / 20);
+                hoop.shakeTime--;
+            } else {
+                hoop.netYOffset = 0;
+            }
+
+            // 링(Ring)
+            ctx.strokeStyle = '#f97316'; // 선명한 오렌지 링
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.ellipse(hoop.x - hoop.ringRadius + 12, hoop.y + 15, hoop.ringRadius, 4, 0, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 골 네트 그리기
+            ctx.strokeStyle = 'rgba(240, 240, 240, 0.8)';
+            ctx.lineWidth = 2;
+            let netStartX = hoop.x - hoop.ringRadius * 2 + 12;
+            let netEndX = hoop.x + 12;
+            let netY = hoop.y + 15;
+
+            // 크로스 형태 그물 구조화
+            for (let i = 0; i <= 6; i++) {
+                let ratio = i / 6;
+                let currentTopX = netStartX + (netEndX - netStartX) * ratio;
+                let bottomX = netStartX + 6 + (netEndX - netStartX - 12) * ratio;
+                
+                ctx.beginPath();
+                ctx.moveTo(currentTopX, netY);
+                // 물리적 골 충돌 및 셰이크 연출
+                ctx.lineTo(bottomX + (hoop.netYOffset * (1 - ratio)), netY + hoop.netHeight + hoop.netYOffset);
+                ctx.stroke();
+            }
+        }
+
+        // 파티클 업데이트 및 렌더링
+        function handleParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += p.gravity;
+                p.alpha -= p.fade;
+                p.angle += p.spin;
+
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.angle);
+                ctx.fillStyle = `rgba(${p.r}, ${p.g}, ${p.b}, ${p.alpha})`;
+                
+                if (p.shape === 'star') {
+                    ctx.beginPath();
+                    for (let j = 0; j < 5; j++) {
+                        ctx.lineTo(0, -p.size);
+                        ctx.rotate(Math.PI / 5);
+                        ctx.lineTo(0, -p.size / 2);
+                        ctx.rotate(Math.PI / 5);
+                    }
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                }
+                ctx.restore();
+
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // 파티클 생성 함수
+        function createFirework(x, y) {
+            const colors = [
+                {r: 251, g: 191, b: 36}, // 금
+                {r: 239, g: 68, b: 68},  // 빨강
+                {r: 59, g: 130, b: 246}, // 파랑
+                {r: 16, g: 185, b: 129}, // 초록
+                {r: 168, g: 85, b: 247}  // 보라
+            ];
+            for (let i = 0; i < 40; i++) {
+                let col = colors[Math.floor(Math.random() * colors.length)];
+                let angle = Math.random() * Math.PI * 2;
+                let speed = 2 + Math.random() * 6;
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 2,
+                    gravity: 0.12,
+                    alpha: 1.0,
+                    fade: 0.015 + Math.random() * 0.015,
+                    size: 4 + Math.random() * 6,
+                    spin: -0.1 + Math.random() * 0.2,
+                    shape: Math.random() > 0.5 ? 'square' : 'star',
+                    r: col.r,
+                    g: col.g,
+                    b: col.b
+                });
+            }
+        }
+
+        // ==========================================
+        //  농구 선수 캐릭터 그리기 로직 (Vector 2D Art)
+        // ==========================================
+        function drawPlayer(p, isPlayerTeam) {
+            ctx.save();
+            ctx.translate(p.x, p.y + p.jumpY);
+
+            // 좌우 방향 반전 (원정 수비수는 왼쪽을 향함)
+            let dir = isPlayerTeam ? 1 : -1;
+
+            // 1. 다리 및 바지
+            ctx.fillStyle = isPlayerTeam ? '#1d4ed8' : '#b91c1c'; // 팀 유니폼 색
+            if (p.pose === 'jump' || p.pose === 'release') {
+                // 점프하는 개구리 형태 무릎 굽힘
+                ctx.fillRect(-10, 50, 6, 15);
+                ctx.fillRect(4, 50, 6, 15);
+                ctx.fillStyle = '#f8fafc'; // 신발
+                ctx.fillRect(-11, 65, 8, 6);
+                ctx.fillRect(3, 65, 8, 6);
+            } else {
+                // 드리블 스탠스 다리 흔들림
+                let legWiggle = Math.sin(Date.now() * 0.01) * 3;
+                ctx.fillRect(-10, 50, 7, 20);
+                ctx.fillRect(3, 50, 7, 20);
+                ctx.fillStyle = '#f8fafc';
+                ctx.fillRect(-12, 70, 9, 6);
+                ctx.fillRect(1, 70, 9, 6);
+            }
+
+            // 2. 몸체 (유니폼 상의)
+            ctx.fillStyle = isPlayerTeam ? '#2563eb' : '#dc2626';
+            ctx.beginPath();
+            ctx.roundRect(-14, 15, 28, 38, 5);
+            ctx.fill();
+
+            // 백넘버 데칼
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(isPlayerTeam ? '23' : '99', 0, 38);
+
+            // 3. 피부 톤 팔/얼굴 그리기
+            ctx.fillStyle = '#fbcfe8'; // 핑크빛 피부 캐릭터
+            
+            // 머리 (얼굴)
+            ctx.beginPath();
+            ctx.arc(0, -2, 11, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 머리카락 / 헤어밴드
+            ctx.fillStyle = isPlayerTeam ? '#fbbf24' : '#1e293b'; // 노란머리 vs 검은머리
+            ctx.fillRect(-12, -12, 24, 7);
+            
+            // 헤어밴드 빨강/파랑 포인트
+            ctx.fillStyle = isPlayerTeam ? '#ef4444' : '#fbbf24';
+            ctx.fillRect(-12, -7, 24, 3);
+
+            // 얼굴 표정 눈/입
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(3 * dir, -4, 2.5, 3);
+            ctx.fillRect(8 * dir, -4, 2.5, 3);
+
+            if (p.pose === 'sad') {
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.arc(6 * dir, 3, 3, Math.PI, 0, false);
+                ctx.stroke();
+            } else {
+                // 일반 또는 기쁨의 벌린 입
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath();
+                ctx.arc(6 * dir, 2, 3.5, 0, Math.PI);
+                ctx.fill();
+            }
+
+            // 4. 동작 자세별 팔과 농구공 위치
+            ctx.strokeStyle = '#fbcfe8';
+            ctx.lineWidth = 5.5;
+            ctx.lineCap = 'round';
+
+            if (p.pose === 'dribble') {
+                // 팔 흔들며 공 튕기기
+                let bounceVal = Math.sin(Date.now() * 0.02) * 12;
+                
+                // 오른팔 (드리블용)
+                ctx.beginPath();
+                ctx.moveTo(-10, 20);
+                ctx.lineTo(-20, 25);
+                ctx.lineTo(-25, 30 + bounceVal / 2);
+                ctx.stroke();
+
+                // 왼팔 (몸 앞으로 둠)
+                ctx.beginPath();
+                ctx.moveTo(10, 20);
+                ctx.lineTo(20, 30);
+                ctx.stroke();
+
+                // 드리블되는 농구공 렌더링
+                if (p.ballInHand) {
+                    drawBasketball(-28, 32 + bounceVal, 10);
+                }
+            } 
+            else if (p.pose === 'gather') {
+                // 슛 전 공 모으기
+                ctx.beginPath();
+                ctx.moveTo(-10, 20);
+                ctx.lineTo(-12, 10);
+                ctx.lineTo(-2, 8);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(10, 20);
+                ctx.lineTo(12, 12);
+                ctx.lineTo(2, 8);
+                ctx.stroke();
+
+                if (p.ballInHand) {
+                    drawBasketball(-5 * dir, 0, 10);
+                }
+            } 
+            else if (p.pose === 'jump') {
+                // 점프 슛 도약
+                ctx.beginPath();
+                ctx.moveTo(-10, 20);
+                ctx.lineTo(-14, -8);
+                ctx.lineTo(-3 * dir, -16);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(10, 20);
+                ctx.lineTo(12, -4);
+                ctx.lineTo(3 * dir, -14);
+                ctx.stroke();
+
+                if (p.ballInHand) {
+                    drawBasketball(-2 * dir, -22, 10);
+                }
+            } 
+            else if (p.pose === 'release') {
+                // 슛 발사 완료 (팔 뻗음)
+                ctx.beginPath();
+                ctx.moveTo(-10, 20);
+                ctx.lineTo(-18 * dir, -18);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(10, 20);
+                ctx.lineTo(16 * dir, -20);
+                ctx.stroke();
+            } 
+            else if (p.pose === 'defend') {
+                // 허리 낮추고 양팔 벌림
+                ctx.beginPath();
+                ctx.moveTo(-12, 20);
+                ctx.lineTo(-24 * dir, 10);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(12, 20);
+                ctx.lineTo(24 * dir, 10);
+                ctx.stroke();
+            }
+            else if (p.pose === 'block') {
+                // 위로 팔을 쭉 뻗어 점프 블록
+                ctx.beginPath();
+                ctx.moveTo(-10, 15);
+                ctx.lineTo(-22 * dir, -24);
+                ctx.stroke();
+
+                ctx.beginPath();
+                ctx.moveTo(10, 15);
+                ctx.lineTo(22 * dir, -26);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        // 디테일한 농구공 텍스처 묘사
+        function drawBasketball(x, y, radius, rotateAngle = 0) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(rotateAngle);
+
+            // 기본 오렌지색
+            ctx.fillStyle = '#f97316';
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 구형 외곽 검은선
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // 농구공 가로/세로 리브 선
+            ctx.beginPath();
+            ctx.moveTo(-radius, 0);
+            ctx.lineTo(radius, 0);
+            ctx.moveTo(0, -radius);
+            ctx.lineTo(0, radius);
+            ctx.stroke();
+
+            // 굴곡선 (둥근 커브)
+            ctx.beginPath();
+            ctx.arc(-radius * 0.7, 0, radius * 0.7, -Math.PI / 2, Math.PI / 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(radius * 0.7, 0, radius * 0.7, Math.PI / 2, -Math.PI / 2);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // ==========================================
+        //  게임 시뮬레이션 및 로직 업데이트 루프
+        // ==========================================
+        function update() {
+            // 1. 관중석 및 코트 렌더링
+            drawCourt();
+
+            // 2. 플레이어 및 수비수 드로잉
+            drawPlayer(playerObj, true);
+            drawPlayer(defenderObj, false);
+
+            // 3. 파티클 처리
+            handleParticles();
+
+            // 4. 날아가는 농구공 포지션 연산 (물리 궤적)
+            if (ballObj.active) {
+                ballObj.progress += 0.015; // 슛 이동 속도 조절
+                ballObj.rotation += 0.1;
+
+                // 2차 베지어 곡선 포뮬러로 높은 포물선 궤도 생성
+                let t = ballObj.progress;
+                let oneMinusT = 1 - t;
+
+                // X 좌표 선형 보간
+                ballObj.x = oneMinusT * ballObj.startX + t * ballObj.targetX;
+                
+                // Y 좌표에 정점 파라볼라 포물선 반영
+                let arcY = -4 * ballObj.maxHeight * t * (1 - t);
+                ballObj.y = (oneMinusT * ballObj.startY + t * ballObj.targetY) + arcY;
+
+                // 공 그리기
+                drawBasketball(ballObj.x, ballObj.y, 11, ballObj.rotation);
+
+                // 스위시 네트 통과 연출을 위한 최적 시점 포착 (y 좌표 하강 도달 시점)
+                if (t > 0.88 && t < 0.94 && !ballObj.swishPlayed) {
+                    // 성공/실패 여부에 따라 링 통과
+                    if (ballObj.isGoal) {
+                        hoop.shakeTime = 30; // 네트 흔들림 시작
+                        ballObj.swishPlayed = true;
+                    }
+                }
+
+                // 골대 테두리 부딪힘 여부 처리 및 연출 바운스
+                if (t >= 1.0) {
+                    ballObj.active = false;
+                    onShotCompleted(ballObj.isGoal);
+                }
+            }
+
+            // 5. 타이밍 슛 바 애니메이션
+            if (playState === 'player-aiming') {
+                gaugeValue += gaugeSpeed * gaugeDirection;
+                if (gaugeValue >= 100) {
+                    gaugeValue = 100;
+                    gaugeDirection = -1; // 벽 튕김
+                } else if (gaugeValue <= 0) {
+                    gaugeValue = 0;
+                    gaugeDirection = 1;
+                }
+                
+                // HTML UI 바 갱신
+                gaugeBar.style.width = `${gaugeValue}%`;
+                
+                // 게이지 포인터 갱신
+                gaugePointer.style.left = `${gaugeValue}%`;
+                gaugePointer.style.display = 'block';
+
+                // 플레이어 힘 모으는 개더 모션 연결
+                playerObj.pose = 'gather';
+            } else {
+                gaugePointer.style.display = 'none';
+            }
+
+            // 6. 상대 수비 시 수비력 자연 감쇠 (방치 시 점진적으로 하락)
+            if (playState === 'enemy-defending') {
+                if (Math.random() < 0.2 && defensePressCount > 0) {
+                    defensePressCount -= 0.15;
+                    updateDefenseBar();
+                }
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        // ==========================================
+        //  경기 진행 규칙 및 아나운서 제어
+        // ==========================================
+        function speakAnnouncer(text, style = 'normal') {
+            announcerText.textContent = text;
+            announcerBox.classList.remove('opacity-0', 'scale-95');
+            announcerBox.classList.add('opacity-100', 'scale-100');
+            
+            // 말풍선 스타일링
+            if (style === 'success') {
+                announcerBox.style.borderColor = '#10b981';
+                announcerBox.style.backgroundColor = 'rgba(6, 78, 59, 0.95)';
+            } else if (style === 'warning') {
+                announcerBox.style.borderColor = '#ef4444';
+                announcerBox.style.backgroundColor = 'rgba(127, 29, 29, 0.95)';
+            } else {
+                announcerBox.style.borderColor = '#3b82f6';
+                announcerBox.style.backgroundColor = 'rgba(15, 23, 42, 0.9)';
+            }
+
+            // 4초 후 서서히 사라짐
+            setTimeout(() => {
+                if (announcerText.textContent === text) {
+                    announcerBox.classList.remove('opacity-100', 'scale-100');
+                    announcerBox.classList.add('opacity-0', 'scale-95');
+                }
+            }, 3800);
+        }
+
+        function showResultPopup(type) {
+            popMessage.classList.remove('scale-0', 'text-yellow-400', 'text-emerald-400', 'text-rose-500');
+            popMessage.classList.add('scale-100');
+            
+            if (type === 'PERFECT') {
+                popMessage.textContent = 'PERFECT 🌟';
+                popMessage.classList.add('text-yellow-400');
+                sound.playPerfect();
+            } else if (type === 'GOOD') {
+                popMessage.textContent = 'GOOD 🎯';
+                popMessage.classList.add('text-emerald-400');
+                sound.playGoal();
+            } else {
+                popMessage.textContent = 'AIR BALL! 💨';
+                popMessage.classList.add('text-rose-500');
+                sound.playFail();
+            }
+
+            setTimeout(() => {
+                popMessage.classList.remove('scale-100');
+                popMessage.classList.add('scale-0');
+            }, 1500);
+        }
+
+        // ==========================================
+        //  경기 흐름 및 공격/수비 사이클
+        // ==========================================
+        
+        // 1. 공격 턴 시작
+        function startPlayerTurn() {
+            if (!gameActive) return;
+            
+            activePossession = 'player';
+            playState = 'idle';
+
+            // 선수들 제자리 위치 리셋
+            playerObj.x = playerObj.baseX;
+            playerObj.y = playerObj.baseY;
+            playerObj.pose = 'dribble';
+            playerObj.ballInHand = true;
+            playerObj.jumpY = 0;
+
+            defenderObj.x = defenderObj.baseX;
+            defenderObj.pose = 'defend';
+            defenderObj.jumpY = 0;
+
+            // 랜덤으로 2점슛 또는 3점슛 존에 서기
+            currentShotType = Math.random() > 0.5 ? 3 : 2;
+            if (currentShotType === 3) {
+                playerObj.x = 110; // 멀리 이동
+                shotTypeLabel.textContent = '3점슛 찬스! (원거리)';
+                // 난이도 상승 (타이밍 슬롯 좁게 설정)
+                timingTargetMin = 65;
+                timingTargetMax = 75;
+                perfectSpot = 70;
+            } else {
+                playerObj.x = 240; // 골대 가깝게
+                shotTypeLabel.textContent = '2점 레이업 / 점퍼 찬스!';
+                timingTargetMin = 55;
+                timingTargetMax = 75;
+                perfectSpot = 65;
+            }
+
+            // 게이지 리셋
+            gaugeValue = 0;
+            gaugeDirection = 1;
+            
+            // 게이지 바 그린 훈련 구역 셋업
+            targetZone.style.left = `${timingTargetMin}%`;
+            targetZone.style.width = `${timingTargetMax - timingTargetMin}%`;
+            perfectLine.style.left = `${perfectSpot}%`;
+
+            // 아나운서 브리핑
+            let phrase = currentShotType === 3 
+                ? '코리아 히어로즈 외곽 아크 지역에서 공을 잡습니다! 3점 라인 대기 중!' 
+                : '골밑을 노리는 코리아 히어로즈! 2점 점프 슛을 준비합니다.';
+            speakAnnouncer(phrase, 'normal');
+
+            // 슛 버튼 대기 UI 노출
+            timingUi.classList.remove('hidden');
+            defenseUi.classList.add('hidden');
+        }
+
+        // 2. 플레이어 슛 시도 시작 (Key Down)
+        function startAiming() {
+            if (playState !== 'idle' || activePossession !== 'player') return;
+            playState = 'player-aiming';
+            sound.playShoot();
+        }
+
+        // 3. 플레이어 슛 릴리즈 (Key Up / 버튼 떼기)
+        function releaseAiming() {
+            if (playState !== 'player-aiming') return;
+            
+            playState = 'player-shooting';
+            timingUi.classList.add('hidden');
+
+            // 게이지 정확도 계산
+            let isGoal = false;
+            let precision = 'MISS';
+            let diff = Math.abs(gaugeValue - perfectSpot);
+
+            if (diff <= 3) {
+                isGoal = true;
+                precision = 'PERFECT';
+            } else if (gaugeValue >= timingTargetMin && gaugeValue <= timingTargetMax) {
+                // 일정 확률 이상으로 성공
+                isGoal = true;
+                precision = 'GOOD';
+            } else {
+                isGoal = false;
+                precision = 'MISS';
+            }
+
+            // 물리 애니메이션 유도: 점프 연출 및 공 발사
+            playerObj.pose = 'jump';
+            playerObj.jumpY = -40; // 힘차게 도약
+            
+            // 수비수 방해 점프
+            defenderObj.pose = 'block';
+            defenderObj.jumpY = -25;
+
+            // 해설 사운드 및 피드백
+            showResultPopup(precision);
+
+            setTimeout(() => {
+                // 실제로 볼 발사 시점
+                playerObj.pose = 'release';
+                playerObj.ballInHand = false;
+
+                // 볼 객체 활성화 및 출발점 셋업
+                ballObj.active = true;
+                ballObj.startX = playerObj.x;
+                ballObj.startY = playerObj.y + playerObj.jumpY - 10;
+                
+                if (isGoal) {
+                    ballObj.targetX = hoop.x - hoop.ringRadius + 12;
+                    ballObj.targetY = hoop.y + 15;
+                    ballObj.isGoal = true;
+                } else {
+                    // 실패 시 무작위 링 테두리 튕김으로 빗나감 연출
+                    ballObj.targetX = hoop.x + (Math.random() > 0.5 ? 20 : -35);
+                    ballObj.targetY = hoop.y + (Math.random() > 0.5 ? 40 : -10);
+                    ballObj.isGoal = false;
+                }
+                ballObj.progress = 0;
+                ballObj.rotation = 0;
+                ballObj.swishPlayed = false;
+
+                playState = 'cutscene';
+            }, 250);
+        }
+
+        // 4. 공이 림에 도착한 결과 처리
+        function onShotCompleted(isGoal) {
+            playState = 'cutscene';
+
+            if (isGoal) {
+                let points = currentShotType;
+                score.player += points;
+                playerScoreEl.textContent = score.player;
+                
+                // 불꽃놀이 파티클 이펙트
+                createFirework(hoop.x - 10, hoop.y + 15);
+                sound.playCrowdCheer();
+
+                speakAnnouncer(`그대로 깨끗하게 골망을 갈랐습니다! 코리아 히어로즈 ${points}점 득점!! 🎉`, 'success');
+                
+                playerObj.pose = 'dribble';
+                defenderObj.pose = 'sad';
+            } else {
+                speakAnnouncer('아쉽게 골대를 외면합니다! 리바운드 경합 돌입!', 'warning');
+                playerObj.pose = 'sad';
+                defenderObj.pose = 'happy';
+            }
+
+            // 2.5초 후 적의 역습 라운드 전환
+            setTimeout(() => {
+                if (gameActive) {
+                    startEnemyTurn();
+                }
+            }, 2500);
+        }
+
+        // ==========================================
+        //  상대편 수비 턴 플레이 로직
+        // ==========================================
+        function startEnemyTurn() {
+            if (!gameActive) return;
+
+            activePossession = 'enemy';
+            playState = 'enemy-defending';
+
+            // 선수 포지션 스왑 (원정이 볼 잡음)
+            playerObj.x = playerObj.baseX;
+            playerObj.pose = 'defend';
+            playerObj.ballInHand = false;
+            playerObj.jumpY = 0;
+
+            defenderObj.x = defenderObj.baseX + 10; // 공격을 위해 림 근처 배치
+            defenderObj.pose = 'dribble';
+            defenderObj.ballInHand = true;
+            defenderObj.jumpY = 0;
+
+            // 수비 수치 초기화
+            defensePressCount = 0;
+            updateDefenseBar();
+
+            // 아나운서 브리핑
+            speakAnnouncer('🚨 비상! 글로벌 자이언츠의 강력한 역습이 전개됩니다! 블로킹을 시도하세요!', 'warning');
+
+            // 수비 UI 표시
+            timingUi.classList.add('hidden');
+            defenseUi.classList.remove('hidden');
+
+            // 3초의 제한 시간 내 연타 시합 진행
+            let secondsLeft = 3;
+            let defenseTimer = setInterval(() => {
+                secondsLeft--;
+                if (secondsLeft <= 0) {
+                    clearInterval(defenseTimer);
+                    resolveEnemyShot();
+                }
+            }, 1000);
+        }
+
+        function triggerDefenseTap() {
+            if (playState !== 'enemy-defending') return;
+            defensePressCount++;
+            if (defensePressCount > targetDefensePress) {
+                defensePressCount = targetDefensePress;
+            }
+            sound.playDefenseBeep();
+            updateDefenseBar();
+        }
+
+        function updateDefenseBar() {
+            let percentage = Math.min((defensePressCount / targetDefensePress) * 100, 100);
+            defenseBar.style.width = `${percentage}%`;
+            defensePercentText.textContent = `방어 압박률: ${Math.round(percentage)}%`;
+        }
+
+        function resolveEnemyShot() {
+            if (playState !== 'enemy-defending') return;
+            
+            playState = 'cutscene';
+            defenseUi.classList.add('hidden');
+
+            // 플레이어 방해율(연타 성공도)에 따른 상대 슛 성공 여부 판정
+            let defenseSuccessRate = defensePressCount / targetDefensePress; // 0.0 ~ 1.0
+            
+            // 난이도 설계: 방해율이 높을수록 골 확률이 기하급수적으로 줄어듦
+            let enemyGoalChance = 0.85 - (defenseSuccessRate * 0.75); // 최소 10% ~ 최대 85% 골 찬스
+            let isEnemyGoal = Math.random() < enemyGoalChance;
+            let enemyShotPoints = Math.random() > 0.6 ? 3 : 2;
+
+            // 연출 실행
+            defenderObj.pose = 'jump';
+            defenderObj.jumpY = -35;
+            
+            if (defenseSuccessRate > 0.6) {
+                // 멋진 블로킹 점프 연출
+                playerObj.pose = 'block';
+                playerObj.jumpY = -35;
+            } else {
+                playerObj.pose = 'defend';
+            }
+
+            setTimeout(() => {
+                defenderObj.pose = 'release';
+                defenderObj.ballInHand = false;
+
+                // 볼 궤적 발사
+                ballObj.active = true;
+                ballObj.startX = defenderObj.x;
+                ballObj.startY = defenderObj.y + defenderObj.jumpY - 10;
+                
+                if (isEnemyGoal) {
+                    ballObj.targetX = hoop.x - hoop.ringRadius + 12;
+                    ballObj.targetY = hoop.y + 15;
+                    ballObj.isGoal = true;
+                } else {
+                    // 수비 성공으로 빗나감
+                    ballObj.targetX = hoop.x + (Math.random() > 0.5 ? 25 : -30);
+                    ballObj.targetY = hoop.y + 10;
+                    ballObj.isGoal = false;
+                }
+                
+                ballObj.progress = 0;
+                ballObj.rotation = 0;
+                ballObj.swishPlayed = false;
+
+                // 볼 비행 종료 후 정산 리스너
+                setTimeout(() => {
+                    ballObj.active = false;
+                    if (isEnemyGoal) {
+                        score.enemy += enemyShotPoints;
+                        enemyScoreEl.textContent = score.enemy;
+                        hoop.shakeTime = 30;
+                        sound.playFail();
+                        speakAnnouncer(`철저한 수비를 뚫고 글로벌 자이언츠가 ${enemyShotPoints}점 득점했습니다... 😔`, 'warning');
+                        defenderObj.pose = 'dribble';
+                        playerObj.pose = 'sad';
+                    } else {
+                        sound.playCrowdCheer();
+                        speakAnnouncer('💪 완벽한 수비 차단! 철저히 슈팅 각도를 좁혔습니다! 역습 찬스!', 'success');
+                        defenderObj.pose = 'sad';
+                        playerObj.pose = 'happy';
+                    }
+
+                    // 다음 우리 턴으로 다시 스위칭
+                    setTimeout(() => {
+                        if (gameActive) {
+                            startPlayerTurn();
+                        }
+                    }, 2500);
+
+                }, 1000);
+
+            }, 250);
+        }
+
+        // ==========================================
+        //  쿼터 및 라운드 시간 제어 시스템
+        // ==========================================
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            
+            timerInterval = setInterval(() => {
+                quarterTimeRemaining--;
+                
+                // 시간 문자열 변환
+                let min = Math.floor(quarterTimeRemaining / 60);
+                let sec = quarterTimeRemaining % 60;
+                gameTimerEl.textContent = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+
+                if (quarterTimeRemaining <= 0) {
+                    clearInterval(timerInterval);
+                    onQuarterFinished();
+                }
+            }, 1000);
+        }
+
+        function onQuarterFinished() {
+            sound.playWhistle();
+            gameActive = false;
+            timingUi.classList.add('hidden');
+            defenseUi.classList.add('hidden');
+
+            // 4쿼터 최종 마감 확인
+            if (currentQuarter >= maxQuarters) {
+                endFullGame();
+            } else {
+                // 중간 휴식 화면
+                document.getElementById('quarter-transition-subtitle').textContent = `제 ${currentQuarter}쿼터 종료`;
+                document.getElementById('quarter-score-player').textContent = score.player;
+                document.getElementById('quarter-score-enemy').textContent = score.enemy;
+                screenQuarter.classList.remove('hidden');
+            }
+        }
+
+        function nextQuarterStart() {
+            screenQuarter.classList.add('hidden');
+            currentQuarter++;
+            
+            // 쿼터 자막 갱신
+            let suffix = 'ND';
+            if (currentQuarter === 3) suffix = 'RD';
+            else if (currentQuarter === 4) suffix = 'TH';
+            gameQuarterEl.textContent = `${currentQuarter}${suffix} QUARTER`;
+
+            quarterTimeRemaining = 60;
+            gameActive = true;
+            startTimer();
+            startPlayerTurn();
+        }
+
+        function endFullGame() {
+            gameActive = false;
+            screenResult.classList.remove('hidden');
+            
+            // 최종 득점 세팅
+            document.getElementById('final-score-player').textContent = score.player;
+            document.getElementById('final-score-enemy').textContent = score.enemy;
+
+            // 판정 문구 세팅
+            const resTitle = document.getElementById('result-title');
+            const resDesc = document.getElementById('result-desc');
+            const resEmoji = document.getElementById('result-emoji');
+            const mvpLabel = document.getElementById('match-mvp');
+
+            if (score.player > score.enemy) {
+                resEmoji.textContent = '🏆';
+                resTitle.textContent = '승리하여 우승을 달성했습니다!';
+                resTitle.className = "font-title text-4xl md:text-6xl text-amber-400 mb-1";
+                resDesc.textContent = '끝없는 집중력으로 리그 강호인 글로벌 자이언츠를 꺾고 왕좌에 올랐습니다!';
+                mvpLabel.textContent = '경기 MVP: 플레이어';
+            } else if (score.player < score.enemy) {
+                resEmoji.textContent = '🥈';
+                resTitle.textContent = '아쉽게 패배하고 말았습니다';
+                resTitle.className = "font-title text-4xl md:text-6xl text-slate-400 mb-1";
+                resDesc.textContent = '비록 이번 경기는 패했지만, 다음 시즌에 더 발전한 기량으로 도전해 보십시오.';
+                mvpLabel.textContent = '경기 MVP: 자이언츠 24번';
+            } else {
+                resEmoji.textContent = '🤝';
+                resTitle.textContent = '치열한 승부 끝에 무승부!';
+                resTitle.className = "font-title text-4xl md:text-6xl text-cyan-400 mb-1";
+                resDesc.textContent = '두 팀 모두 명승부를 선사했습니다. 가치 있는 최고의 명경기였습니다!';
+                mvpLabel.textContent = '경기 MVP: 공동 선발';
+            }
+        }
+
+        function initFullGame() {
+            score.player = 0;
+            score.enemy = 0;
+            currentQuarter = 1;
+            quarterTimeRemaining = 60;
+            gameActive = true;
+
+            playerScoreEl.textContent = '0';
+            enemyScoreEl.textContent = '0';
+            gameQuarterEl.textContent = '1ST QUARTER';
+            gameTimerEl.textContent = '01:00';
+
+            screenStart.classList.add('hidden');
+            screenResult.classList.add('hidden');
+            scoreboard.classList.remove('hidden');
+
+            initCrowd();
+            sound.playWhistle();
+            startTimer();
+            startPlayerTurn();
+        }
+
+        // ==========================================
+        //  이벤트 리스너 및 터치/키보드 바인딩
+        // ==========================================
+        
+        // 시작 및 릴레이 컨트롤러 바인딩
+        btnStart.addEventListener('click', () => {
+            sound.init();
+            initFullGame();
+        });
+        btnNextQuarter.addEventListener('click', nextQuarterStart);
+        btnReplay.addEventListener('click', initFullGame);
+
+        // 스페이스 바 키를 통한 일치화 제어
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (!isSpacePressed) {
+                    isSpacePressed = true;
+                    if (playState === 'idle' && activePossession === 'player') {
+                        startAiming();
+                    } else if (playState === 'enemy-defending') {
+                        triggerDefenseTap();
+                    }
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                isSpacePressed = false;
+                if (playState === 'player-aiming') {
+                    releaseAiming();
+                }
+            }
+        });
+
+        // 모바일 터치 및 클릭 액션 바인딩 (슛 버튼 터치 타겟)
+        btnShootAction.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (playState === 'idle' && activePossession === 'player') {
+                startAiming();
+            }
+        });
+        window.addEventListener('mouseup', (e) => {
+            if (playState === 'player-aiming') {
+                releaseAiming();
+            }
+        });
+
+        // 모바일 터치이벤트 대응
+        btnShootAction.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (playState === 'idle' && activePossession === 'player') {
+                startAiming();
+            }
+        }, { passive: false });
+        btnShootAction.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (playState === 'player-aiming') {
+                releaseAiming();
+            }
+        }, { passive: false });
+
+        // 수비 탭 연타 마우스/터치 바인딩
+        btnBlockAction.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (playState === 'enemy-defending') {
+                triggerDefenseTap();
+            }
+        });
+        btnBlockAction.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (playState === 'enemy-defending') {
+                triggerDefenseTap();
+            }
+        }, { passive: false });
+
+
+        // 초기 화면 구동 루프 가동
+        initCrowd();
+        requestAnimationFrame(update);
+    </script>
+</body>
+</html>
